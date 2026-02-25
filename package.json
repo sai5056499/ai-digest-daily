@@ -1,0 +1,48 @@
+{
+  "name": "ai-tech-news-aggregator",
+  "version": "1.0.0",
+  "private": true,
+  "description": "AI-powered tech news aggregator with daily email digests",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "pipeline": "tsx --tsconfig tsconfig.json scripts/run-pipeline.ts",
+    "collect": "tsx --tsconfig tsconfig.json scripts/collect-only.ts",
+    "cron": "tsx --tsconfig tsconfig.json scripts/cron.ts",
+    "setup-db": "tsx --tsconfig tsconfig.json scripts/setup-db.ts"
+  },
+  "dependencies": {
+    "@google/generative-ai": "^0.24.1",
+    "@tailwindcss/postcss": "^4.1.18",
+    "@types/node": "^25.2.3",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "autoprefixer": "^10.4.24",
+    "dotenv": "^17.3.1",
+    "eslint": "^9.39.2",
+    "eslint-config-next": "^16.1.6",
+    "firebase-admin": "^13.6.1",
+    "groq-sdk": "^0.37.0",
+    "handlebars": "^4.7.8",
+    "next": "^16.1.6",
+    "node-cron": "^4.2.1",
+    "node-telegram-bot-api": "^0.67.0",
+    "nodemailer": "^8.0.1",
+    "postcss": "^8.5.6",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "resend": "^6.9.2",
+    "rss-parser": "^3.13.0",
+    "tailwindcss": "^4.1.18",
+    "typescript": "^5.9.3"
+  },
+  "devDependencies": {
+    "@types/node-cron": "^3.0.11",
+    "@types/node-telegram-bot-api": "^0.64.13",
+    "@types/nodemailer": "^7.0.10",
+    "playwright": "^1.58.2",
+    "tsx": "^4.21.0"
+  }
+}
