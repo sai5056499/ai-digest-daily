@@ -26,9 +26,9 @@ interface Settings {
   showDeepDive: boolean;
   showPaperOfTheDay: boolean;
   showDataPoints: boolean;
-  showKeyTakeaways: boolean;
-  showQuoteOfTheDay: boolean;
-  showRelatedReads: boolean;
+  showCommunityPulse: boolean;
+  showDiscussionQuestion: boolean;
+  weeklyEditionEnabled: boolean;
   showToolOfTheDay: boolean;
 }
 
@@ -216,10 +216,10 @@ export default function SandboxPage() {
                   <Toggle label="By the Numbers (data points)" checked={draft.showDataPoints} onChange={(v) => update("showDataPoints", v)} />
                 </div>
                 <div className="pt-3 border-t border-[#f4f4f5]">
-                  <p className="text-[11px] font-medium uppercase tracking-[0.1em] text-[#a1a1aa] mb-3">Phase 3 — Engagement</p>
-                  <Toggle label="Key Takeaways" checked={draft.showKeyTakeaways} onChange={(v) => update("showKeyTakeaways", v)} />
-                  <Toggle label="Quote of the Day" checked={draft.showQuoteOfTheDay} onChange={(v) => update("showQuoteOfTheDay", v)} />
-                  <Toggle label="Related Reads" checked={draft.showRelatedReads} onChange={(v) => update("showRelatedReads", v)} />
+                  <p className="text-[11px] font-medium uppercase tracking-[0.1em] text-[#a1a1aa] mb-3">Engagement & Growth</p>
+                  <Toggle label="Community Pulse (GitHub Trending)" checked={draft.showCommunityPulse} onChange={(v) => update("showCommunityPulse", v)} />
+                  <Toggle label="Discussion Question" checked={draft.showDiscussionQuestion} onChange={(v) => update("showDiscussionQuestion", v)} />
+                  <Toggle label="Weekly Edition (Sundays)" checked={draft.weeklyEditionEnabled} onChange={(v) => update("weeklyEditionEnabled", v)} />
                 </div>
                 <div className="pt-3 border-t border-[#f4f4f5]">
                   <p className="text-[11px] font-medium uppercase tracking-[0.1em] text-[#a1a1aa] mb-3">Spotlight</p>
@@ -410,9 +410,9 @@ export default function SandboxPage() {
                   <FeatureRow label="Deep Dive analysis" on={draft.showDeepDive} />
                   <FeatureRow label="Paper of the Day" on={draft.showPaperOfTheDay} />
                   <FeatureRow label="By the Numbers" on={draft.showDataPoints} />
-                  <FeatureRow label="Key Takeaways" on={draft.showKeyTakeaways} />
-                  <FeatureRow label="Quote of the Day" on={draft.showQuoteOfTheDay} />
-                  <FeatureRow label="Related Reads" on={draft.showRelatedReads} />
+                  <FeatureRow label="Community Pulse" on={draft.showCommunityPulse} />
+                  <FeatureRow label="Discussion Question" on={draft.showDiscussionQuestion} />
+                  <FeatureRow label="Weekly Edition" on={draft.weeklyEditionEnabled} />
                   <FeatureRow label="Tool of the Day spotlight" on={draft.showToolOfTheDay} />
                 </div>
               </div>

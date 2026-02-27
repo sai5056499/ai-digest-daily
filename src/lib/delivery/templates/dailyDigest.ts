@@ -319,13 +319,19 @@ function generateCSS(t: ThemeColors): string {
     .quote-attribution { font-size: 12px; color: ${t.textMuted}; }
     .quote-attribution a { color: ${t.textMuted}; text-decoration: none; }
     .quote-attribution a:hover { color: ${t.accentSecondary}; }
-    .related-reads-block { margin: 0 32px ${simple ? "20px" : "24px"}; padding: ${simple ? "16px 18px" : "20px"}; background: ${t.surface}; border-radius: ${simple ? "6px" : "10px"}; border: 1px solid ${t.border}; }
-    .related-reads-tag { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.12em; color: ${t.accent}; margin-bottom: 12px; font-family: 'SF Mono', SFMono-Regular, Menlo, monospace; }
-    .rr-item { padding: 10px 0; border-bottom: 1px solid ${t.border}; }
-    .rr-item:last-child { border-bottom: none; }
-    .rr-item a { font-size: 13px; font-weight: 600; color: ${t.text}; text-decoration: none; }
-    .rr-item a:hover { color: ${t.accentSecondary}; }
-    .rr-src { font-size: 11px; color: ${t.textFaint}; margin-top: 2px; font-family: 'SF Mono', SFMono-Regular, Menlo, monospace; }
+    .community-pulse { margin: 0 32px ${simple ? "20px" : "24px"}; padding: ${simple ? "16px 18px" : "20px"}; background: ${t.surface}; border-radius: ${simple ? "6px" : "10px"}; border: 1px solid ${t.border}; }
+    .community-pulse-tag { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.12em; color: ${t.green}; margin-bottom: 14px; font-family: 'SF Mono', SFMono-Regular, Menlo, monospace; }
+    .cp-item { padding: 8px 0; border-bottom: 1px solid ${t.border}; }
+    .cp-item:last-child { border-bottom: none; }
+    .cp-name { font-size: 13px; font-weight: 700; color: ${t.text}; text-decoration: none; display: block; margin-bottom: 2px; }
+    .cp-name:hover { color: ${t.accentSecondary}; }
+    .cp-desc { font-size: 12px; color: ${t.textMuted}; line-height: 1.5; margin-bottom: 3px; }
+    .cp-meta { font-size: 10px; color: ${t.textFaint}; font-family: 'SF Mono', SFMono-Regular, Menlo, monospace; }
+
+    .discussion-block { margin: 0 32px ${simple ? "16px" : "20px"}; padding: ${simple ? "16px 18px" : "20px"}; background: ${t.cardFeatured}; border-radius: ${simple ? "6px" : "10px"}; border: 1px solid ${t.cardFeaturedBorder}; text-align: center; }
+    .discussion-tag { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.12em; color: ${t.accentSecondary}; margin-bottom: 10px; font-family: 'SF Mono', SFMono-Regular, Menlo, monospace; }
+    .discussion-text { font-size: 15px; line-height: 1.6; color: ${t.text}; font-weight: 600; margin-bottom: 8px; }
+    .discussion-cta { font-size: 12px; color: ${t.textMuted}; }
 
     .section-sep { height: 1px; background: ${t.border}; margin: 8px 32px; }
 
@@ -378,6 +384,8 @@ function generateCSS(t: ThemeColors): string {
       .deep-dive { margin: 0 20px 20px; }
       .paper-block { margin: 0 20px 20px; }
       .numbers-block { margin: 0 20px 20px; }
+      .community-pulse { margin: 0 20px 20px; }
+      .discussion-block { margin: 0 20px 16px; }
       .key-takeaways-block { margin: 0 20px 20px; }
       .quote-block { margin: 0 20px 20px; }
       .related-reads-block { margin: 0 20px 20px; }
@@ -426,6 +434,12 @@ const BODY_TEMPLATE = `<!DOCTYPE html>
         <span class="stat-val">{{aiArticlesCount}}</span>
         <span class="stat-lbl">AI Stories</span>
       </div>
+      {{#if readTimeMinutes}}
+      <div class="stat-block">
+        <span class="stat-val">{{readTimeMinutes}}</span>
+        <span class="stat-lbl">Min Read</span>
+      </div>
+      {{/if}}
     </div>
 
     <div class="intro-block">{{{intro}}}</div>
@@ -669,6 +683,27 @@ const BODY_TEMPLATE = `<!DOCTYPE html>
     </div>
     {{/if}}
 
+    {{#if communityPulse.length}}
+    <div class="community-pulse">
+      <div class="community-pulse-tag">&#127793; Community Pulse &mdash; Trending on GitHub</div>
+      {{#each communityPulse}}
+      <div class="cp-item">
+        <a href="{{url}}" class="cp-name">{{name}}</a>
+        <div class="cp-desc">{{description}}</div>
+        <div class="cp-meta">{{language}} &middot; &#9733; {{stars}}</div>
+      </div>
+      {{/each}}
+    </div>
+    {{/if}}
+
+    {{#if discussionQuestion}}
+    <div class="discussion-block">
+      <div class="discussion-tag">&#128172; Join the Conversation</div>
+      <div class="discussion-text">{{discussionQuestion}}</div>
+      <div class="discussion-cta">Hit reply and tell us what you think.</div>
+    </div>
+    {{/if}}
+
     <div class="footer">
       <p style="color:{{_theme.textMuted}};">Curated by AI from {{sourcesCount}}+ sources</p>
       <p>
@@ -741,9 +776,8 @@ export function renderDailyDigest(data: EmailTemplateData): string {
     deepDive: newsletter.deep_dive || null,
     paperOfTheDay: newsletter.paper_of_the_day || null,
     dataPoints: newsletter.data_points || [],
-    key_takeaways: newsletter.key_takeaways || [],
-    quote_of_the_day: newsletter.quote_of_the_day || null,
-    related_reads: newsletter.related_reads || [],
+    communityPulse: newsletter.community_pulse || [],
+    discussionQuestion: newsletter.discussion_question || "",
     topStories: newsletter.topStories,
     aiNews: newsletter.aiNews,
     techNews: newsletter.techNews,
@@ -752,10 +786,182 @@ export function renderDailyDigest(data: EmailTemplateData): string {
     quickLinks,
     toolOfTheDay: data.toolOfTheDay || null,
     unsubscribeUrl: `${appUrl}/api/unsubscribe?token=${unsubscribeToken}`,
-    preferencesUrl: `${appUrl}/dashboard`,
+    preferencesUrl: `${appUrl}/preferences?token=${unsubscribeToken}`,
     themeCSS: generateCSS(themeColors),
     _theme: themeColors,
   };
 
   return compiledTemplate(templateData);
+}
+
+// ── Weekly Recap Template ─────────────────────────────────
+
+const WEEKLY_TEMPLATE = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI & Tech Weekly</title>
+  <style>{{{themeCSS}}}</style>
+</head>
+<body>
+  <div class="wrapper">
+
+    <div class="accent-line"></div>
+
+    <div class="header">
+      <div class="header-row">
+        <span class="brand">AI & Tech Weekly</span>
+        <span class="issue-badge">Week in Review</span>
+      </div>
+      <div class="header-date">{{dateRange}}</div>
+      <div class="header-headline">
+        Your weekly<br>
+        <span>intelligence recap.</span>
+      </div>
+    </div>
+
+    <div class="stats-row">
+      <div class="stat-block">
+        <span class="stat-val">{{totalArticles}}</span>
+        <span class="stat-lbl">Articles</span>
+      </div>
+      <div class="stat-block">
+        <span class="stat-val">{{sourcesCount}}</span>
+        <span class="stat-lbl">Sources</span>
+      </div>
+      <div class="stat-block">
+        <span class="stat-val">{{topStoriesCount}}</span>
+        <span class="stat-lbl">Top Stories</span>
+      </div>
+    </div>
+
+    <div class="intro-block">{{{intro}}}</div>
+
+    {{#if weekInReview}}
+    <div class="tldr-block">
+      <div class="tldr-tag">&#128218; Week in Review</div>
+      <div class="tldr-text">{{weekInReview}}</div>
+    </div>
+    {{/if}}
+
+    {{#if topThemes.length}}
+    <div class="trend-block">
+      <div class="trend-tag">&#x2191; This Week's Themes</div>
+      <div class="trend-text">
+        {{#each topThemes}}
+        <div style="margin-bottom:8px;">&#8226; {{this}}</div>
+        {{/each}}
+      </div>
+    </div>
+    {{/if}}
+
+    {{#if topStories.length}}
+    <div class="section">
+      <div class="section-head">
+        <div class="section-icon top">&#9733;</div>
+        <span class="section-label">Top Stories This Week</span>
+      </div>
+      {{#each topStories}}
+      <div class="article-card{{#if (gte ai_importance 8)}} featured{{/if}}">
+        <a href="{{link}}" class="article-title">{{title}}</a>
+        <div class="article-meta">{{source}} &middot; {{timeAgo published_at}}</div>
+        {{{importanceBar ai_importance}}}
+        <div class="article-summary">{{ai_summary}}</div>
+        <a href="{{link}}" class="read-btn">Read more &#8594;</a>
+      </div>
+      {{/each}}
+    </div>
+    {{/if}}
+
+    {{#if aiHighlights.length}}
+    <div class="section-sep"></div>
+    <div class="section">
+      <div class="section-head">
+        <div class="section-icon ai">&#9672;</div>
+        <span class="section-label">AI Highlights</span>
+      </div>
+      {{#each aiHighlights}}
+      <div class="article-card">
+        <a href="{{link}}" class="article-title">{{title}}</a>
+        <div class="article-meta">{{source}} &middot; {{timeAgo published_at}}</div>
+        <div class="article-summary">{{ai_summary}}</div>
+        <a href="{{link}}" class="read-btn">Read more &#8594;</a>
+      </div>
+      {{/each}}
+    </div>
+    {{/if}}
+
+    {{#if techHighlights.length}}
+    <div class="section-sep"></div>
+    <div class="section">
+      <div class="section-head">
+        <div class="section-icon tech">&#9670;</div>
+        <span class="section-label">Tech Highlights</span>
+      </div>
+      {{#each techHighlights}}
+      <div class="article-card">
+        <a href="{{link}}" class="article-title">{{title}}</a>
+        <div class="article-meta">{{source}} &middot; {{timeAgo published_at}}</div>
+        <div class="article-summary">{{ai_summary}}</div>
+        <a href="{{link}}" class="read-btn">Read more &#8594;</a>
+      </div>
+      {{/each}}
+    </div>
+    {{/if}}
+
+    <div class="footer">
+      <p style="color:{{_theme.textMuted}};">Weekly recap &mdash; curated by AI from {{sourcesCount}}+ sources</p>
+      <p>
+        <a href="{{preferencesUrl}}">preferences</a>
+        <span style="margin:0 6px;color:{{_theme.border}};">&middot;</span>
+        <a href="{{unsubscribeUrl}}">unsubscribe</a>
+      </p>
+      <div class="footer-brand">AI & Tech Weekly</div>
+    </div>
+
+    <div class="accent-line"></div>
+
+  </div>
+</body>
+</html>`;
+
+const compiledWeeklyTemplate = Handlebars.compile(WEEKLY_TEMPLATE);
+
+export interface WeeklyEmailTemplateData {
+  weeklyData: import("@/lib/ai/newsletterComposer").WeeklyRecapData;
+  subscriberEmail: string;
+  unsubscribeToken: string;
+  appUrl: string;
+  theme?: EmailTheme;
+}
+
+export function renderWeeklyDigest(data: WeeklyEmailTemplateData): string {
+  const { weeklyData, unsubscribeToken, appUrl } = data;
+  const themeName = data.theme || "notion";
+  const themeColors = getThemeColors(themeName);
+
+  const now = new Date();
+  const weekAgo = new Date(Date.now() - 7 * 86400000);
+  const fmt = (d: Date) =>
+    d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+
+  const templateData = {
+    dateRange: `${fmt(weekAgo)} — ${fmt(now)}, ${now.getFullYear()}`,
+    totalArticles: weeklyData.totalArticlesThisWeek,
+    sourcesCount: weeklyData.totalSourcesThisWeek,
+    topStoriesCount: weeklyData.topStories.length,
+    intro: weeklyData.intro,
+    weekInReview: weeklyData.week_in_review || "",
+    topThemes: weeklyData.top_themes || [],
+    topStories: weeklyData.topStories,
+    aiHighlights: weeklyData.aiHighlights,
+    techHighlights: weeklyData.techHighlights,
+    unsubscribeUrl: `${appUrl}/api/unsubscribe?token=${unsubscribeToken}`,
+    preferencesUrl: `${appUrl}/preferences?token=${unsubscribeToken}`,
+    themeCSS: generateCSS(themeColors),
+    _theme: themeColors,
+  };
+
+  return compiledWeeklyTemplate(templateData);
 }

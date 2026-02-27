@@ -112,12 +112,6 @@ export const RSS_SOURCES: Record<string, RSSSource[]> = {
       category: "tech",
       priority: "high",
     },
-    {
-      name: "InfoQ",
-      url: "https://feed.infoq.com/",
-      category: "tech",
-      priority: "medium",
-    },
   ],
 
   cybersecurity: [
@@ -181,6 +175,12 @@ export const RSS_SOURCES: Record<string, RSSSource[]> = {
   ],
 
   dev_community: [
+    {
+      name: "InfoQ",
+      url: "https://feed.infoq.com/",
+      category: "dev_community",
+      priority: "medium",
+    },
     {
       name: "DEV.to",
       url: "https://dev.to/feed",

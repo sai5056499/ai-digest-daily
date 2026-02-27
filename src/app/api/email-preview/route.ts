@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { renderDailyDigest, type EmailTheme } from "@/lib/delivery/templates/dailyDigest";
+import { renderDailyDigest, renderWeeklyDigest, type EmailTheme } from "@/lib/delivery/templates/dailyDigest";
 
 const now = new Date().toISOString();
 const h = (hours: number) => new Date(Date.now() - hours * 3600000).toISOString();
@@ -296,22 +296,13 @@ Expect Google DeepMind and Anthropic to respond within weeks. The reasoning mode
     { stat: "15M weekly downloads affected", context: "Critical Zero-Day in Popular NPM Package", source: "The Hacker News", link: "https://example.com/9" },
     { stat: "2x price-performance", context: "AWS Launches Graviton5 Instances", source: "AWS", link: "https://example.com/11" },
   ],
-  key_takeaways: [
-    "OpenAI's new reasoning models set records on every major benchmark — expect a wave of smarter coding tools and agents.",
-    "AlphaFold 4 moves from predicting protein structures to designing them from scratch; drug discovery timelines could shrink by years.",
-    "Open-source AI (Llama 4, Claude memory) is closing the gap with proprietary APIs; the moat is shifting to inference and workflow.",
+  community_pulse: [
+    { name: "browser-use/browser-use", url: "https://github.com/browser-use/browser-use", description: "Make websites accessible for AI agents. Automate browser interactions with natural language.", language: "Python", stars: 52400 },
+    { name: "jina-ai/reader", url: "https://github.com/jina-ai/reader", description: "Convert any URL to an LLM-friendly input with a simple prefix.", language: "TypeScript", stars: 18200 },
+    { name: "vercel/ai", url: "https://github.com/vercel/ai", description: "Build AI-powered applications with React, Next.js, and Svelte. SDK for streaming AI responses.", language: "TypeScript", stars: 12800 },
+    { name: "openai/swarm", url: "https://github.com/openai/swarm", description: "Experimental framework for multi-agent orchestration with handoffs.", language: "Python", stars: 24100 },
   ],
-  quote_of_the_day: {
-    quote: "The most profound technologies are those that disappear. They weave themselves into the fabric of everyday life until they are indistinguishable from it.",
-    attribution: "Mark Weiser",
-    source: "The Computer for the 21st Century",
-    link: "https://example.com/weiser",
-  },
-  related_reads: [
-    { title: "Why Reasoning Is the Next Frontier for AI", link: "https://example.com/related1", source: "MIT Tech Review" },
-    { title: "Protein Design Beyond AlphaFold", link: "https://example.com/related2", source: "Nature" },
-    { title: "The Economics of Open-Source AI", link: "https://example.com/related3", source: "a16z" },
-  ],
+  discussion_question: "What's your take: will open-source models like Llama 4 make proprietary APIs irrelevant within 2 years, or will the intelligence gap keep widening?",
   topStories,
   aiNews,
   techNews,
@@ -333,12 +324,44 @@ Expect Google DeepMind and Anthropic to respond within weeks. The reasoning mode
   generatedAt: now,
 };
 
+const WEEKLY_SAMPLE = {
+  subject_line: "📊 AI & Tech Weekly — Week in Review",
+  intro: "What a week. Three major model releases, a landmark regulation, and a supply-chain zero-day that affected millions. Here's everything that mattered, distilled into one read.",
+  week_in_review: "This was the week open-source AI went mainstream. Meta's Llama 4, Hugging Face's GPT-4V alternative, and Stability AI's video model all dropped within days of each other, each matching or exceeding proprietary alternatives on key benchmarks. Meanwhile, OpenAI doubled down on reasoning as its moat, launching next-gen models that set records on GPQA and SWE-bench. The strategic implication is clear: the base model layer is commoditizing, and the real competition is shifting to inference speed, tool integration, and the relationship layer — memory, personalization, and workflow embedding. The EU's AI Liability Directive adds a regulatory dimension that will force every company deploying AI in Europe to rethink their documentation and insurance practices.",
+  top_themes: [
+    "Open-source AI models reached parity with proprietary alternatives across multiple modalities",
+    "Reasoning capabilities emerged as the new primary battleground between AI labs",
+    "Supply-chain security remained fragile — a single NPM zero-day affected 15M weekly downloads",
+  ],
+  topStories: [...topStories, ...aiNews.slice(0, 1)],
+  aiHighlights: aiNews,
+  techHighlights: techNews,
+  totalArticlesThisWeek: 142,
+  totalSourcesThisWeek: 28,
+  generatedAt: now,
+};
+
 export async function GET(request: NextRequest) {
   try {
     const themeParam = request.nextUrl.searchParams.get("theme") || "dark";
     const theme = ["dark", "light", "notion", "notionDark"].includes(themeParam)
       ? (themeParam as EmailTheme)
       : "dark";
+    const edition = request.nextUrl.searchParams.get("edition") || "daily";
+
+    if (edition === "weekly") {
+      const html = renderWeeklyDigest({
+        weeklyData: WEEKLY_SAMPLE as any,
+        subscriberEmail: "preview@example.com",
+        unsubscribeToken: "preview",
+        appUrl: "https://example.com",
+        theme,
+      });
+
+      return new NextResponse(html, {
+        headers: { "Content-Type": "text/html; charset=utf-8" },
+      });
+    }
 
     const html = renderDailyDigest({
       newsletter: SAMPLE_DATA as any,

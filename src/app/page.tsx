@@ -16,8 +16,19 @@ interface ToolOfTheDay {
   published_at: string;
 }
 
+const TOPIC_GROUPS = [
+  { id: "ai", label: "AI & ML", categories: ["ai_breakthrough", "ai_tool", "ai_research"] },
+  { id: "tech", label: "Tech News", categories: ["tech_news", "gadgets", "software"] },
+  { id: "cybersecurity", label: "Security", categories: ["cybersecurity"] },
+  { id: "cloud", label: "Cloud & DevOps", categories: ["cloud", "devops"] },
+  { id: "startup", label: "Startups", categories: ["startup", "business"] },
+  { id: "dev", label: "Developer", categories: ["dev_community"] },
+  { id: "science", label: "Science", categories: ["science"] },
+] as const;
+
 export default function LandingPage() {
   const [email, setEmail] = useState("");
+  const [selectedTopics, setSelectedTopics] = useState<Set<string>>(new Set(["ai", "tech"]));
   const [status, setStatus] = useState<
     "idle" | "loading" | "success" | "error" | "already"
   >("idle");
@@ -28,6 +39,18 @@ export default function LandingPage() {
     sourcesCount: 0,
   });
   const [toolOfTheDay, setToolOfTheDay] = useState<ToolOfTheDay | null>(null);
+
+  const toggleTopic = (id: string) => {
+    setSelectedTopics((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        if (next.size > 1) next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
 
   useEffect(() => {
     fetch("/api/stats")
@@ -51,10 +74,14 @@ export default function LandingPage() {
     setErrorMessage("");
 
     try {
+      const categories = TOPIC_GROUPS
+        .filter((g) => selectedTopics.has(g.id))
+        .flatMap((g) => g.categories);
+
       const res = await fetch("/api/subscribe", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, frequency: "daily" }),
+        body: JSON.stringify({ email, frequency: "daily", categories }),
       });
       const data = await res.json();
       if (res.ok) {
@@ -79,12 +106,20 @@ export default function LandingPage() {
         <span className="text-[15px] font-semibold tracking-tight">
           ai&thinsp;&&thinsp;tech daily
         </span>
-        <a
-          href="/dashboard"
-          className="text-[13px] text-[#71717a] hover:text-[#0a0a0a] transition-colors duration-300"
-        >
-          dashboard
-        </a>
+        <div className="flex items-center gap-4">
+          <a
+            href="/archive"
+            className="text-[13px] text-[#71717a] hover:text-[#0a0a0a] transition-colors duration-300"
+          >
+            archive
+          </a>
+          <a
+            href="/dashboard"
+            className="text-[13px] text-[#71717a] hover:text-[#0a0a0a] transition-colors duration-300"
+          >
+            dashboard
+          </a>
+        </div>
       </nav>
 
       {/* Hero */}
@@ -143,6 +178,24 @@ export default function LandingPage() {
                 "Subscribe"
               )}
             </button>
+          </div>
+
+          {/* Topic picker */}
+          <div className="flex flex-wrap justify-center gap-1.5 mt-4">
+            {TOPIC_GROUPS.map((group) => (
+              <button
+                key={group.id}
+                type="button"
+                onClick={() => toggleTopic(group.id)}
+                className={`px-3 py-1.5 rounded-full text-[12px] font-medium border transition-all duration-200 ${
+                  selectedTopics.has(group.id)
+                    ? "bg-[#0a0a0a] text-white border-[#0a0a0a]"
+                    : "bg-white text-[#71717a] border-[#e4e4e7] hover:border-[#a1a1aa]"
+                }`}
+              >
+                {group.label}
+              </button>
+            ))}
           </div>
 
           {/* Status messages */}
@@ -320,6 +373,8 @@ export default function LandingPage() {
       {/* Footer */}
       <footer className="relative z-10 text-center py-10 border-t border-[#e4e4e7]">
         <p className="text-[12px] text-[#a1a1aa]">
+          <a href="/archive" className="hover:text-[#0a0a0a] transition-colors duration-300">archive</a>
+          <span className="mx-2">&middot;</span>
           <a href="/dashboard" className="hover:text-[#0a0a0a] transition-colors duration-300">dashboard</a>
           <span className="mx-2">&middot;</span>
           built with next.js, groq ai & resend

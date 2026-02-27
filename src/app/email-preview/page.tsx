@@ -4,20 +4,22 @@ import { useState, useEffect } from "react";
 
 type Device = "desktop" | "mobile";
 type Theme = "dark" | "light" | "notion" | "notionDark";
+type Edition = "daily" | "weekly";
 
 export default function EmailPreviewPage() {
   const [device, setDevice] = useState<Device>("desktop");
   const [theme, setTheme] = useState<Theme>("notion");
+  const [edition, setEdition] = useState<Edition>("daily");
   const [loaded, setLoaded] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
 
   const widths: Record<Device, number> = { desktop: 620, mobile: 375 };
 
-  const iframeSrc = `/api/email-preview?theme=${theme}&_=${refreshKey}`;
+  const iframeSrc = `/api/email-preview?theme=${theme}&edition=${edition}&_=${refreshKey}`;
 
   useEffect(() => {
     setLoaded(false);
-  }, [refreshKey, theme]);
+  }, [refreshKey, theme, edition]);
 
   const isDark = theme === "dark" || theme === "notionDark";
   const pageBg = isDark ? "#09090b" : "#f5f5f5";
@@ -187,6 +189,32 @@ export default function EmailPreviewPage() {
 
           {/* Right */}
           <div className="flex items-center gap-3">
+            {/* Edition toggle */}
+            <div className="flex items-center gap-1 rounded-lg p-1 transition-colors" style={{ background: pillBg }}>
+              <button
+                onClick={() => setEdition("daily")}
+                className="px-3 py-1.5 rounded-md text-[12px] font-medium transition-all duration-200"
+                style={{
+                  background: edition === "daily" ? pillActive : "transparent",
+                  color: edition === "daily" ? pillActiveText : pillText,
+                }}
+              >
+                Daily
+              </button>
+              <button
+                onClick={() => setEdition("weekly")}
+                className="px-3 py-1.5 rounded-md text-[12px] font-medium transition-all duration-200"
+                style={{
+                  background: edition === "weekly" ? pillActive : "transparent",
+                  color: edition === "weekly" ? pillActiveText : pillText,
+                }}
+              >
+                Weekly
+              </button>
+            </div>
+
+            <div className="w-px h-5 transition-colors" style={{ background: toolbarBorder }} />
+
             <button
               onClick={() => setRefreshKey((k) => k + 1)}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[12px] font-medium transition-all duration-200 hover:opacity-80"
@@ -240,7 +268,7 @@ export default function EmailPreviewPage() {
                 className="flex-1 rounded-md px-3 py-1 text-[11px] font-mono text-center transition-colors"
                 style={{ background: chromeBar, color: chromeBarText }}
               >
-                email preview &mdash; {theme} &mdash; {widths[device]}px
+                {edition} preview &mdash; {theme} &mdash; {widths[device]}px
               </div>
             </div>
 

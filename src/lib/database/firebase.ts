@@ -210,6 +210,33 @@ export async function updateArticleAI(
     });
 }
 
+export async function getArticleById(id: string): Promise<Article | null> {
+  const firestore = getDb();
+  const doc = await firestore.collection(COLLECTIONS.articles).doc(id).get();
+  if (!doc.exists) return null;
+  return { id: doc.id, ...doc.data() } as Article;
+}
+
+export async function getRelatedArticles(
+  category: string,
+  excludeId: string,
+  limit = 5
+): Promise<Article[]> {
+  const firestore = getDb();
+  const snapshot = await firestore
+    .collection(COLLECTIONS.articles)
+    .where("processed", "==", true)
+    .where("ai_category", "==", category)
+    .orderBy("published_at", "desc")
+    .limit(limit + 1)
+    .get();
+
+  return snapshot.docs
+    .map((doc) => ({ id: doc.id, ...doc.data() } as Article))
+    .filter((a) => a.id !== excludeId)
+    .slice(0, limit);
+}
+
 // ─── Subscriber Operations ───────────────────────────────────
 
 export async function getActiveSubscribers(

@@ -42,18 +42,25 @@ export interface DataPointItem {
   link: string;
 }
 
-// Phase 3
-export interface QuoteOfTheDayData {
-  quote: string;
-  attribution: string;
-  source: string;
-  link: string;
+export interface CommunityPulseRepo {
+  name: string;
+  url: string;
+  description: string;
+  language: string;
+  stars: number;
 }
 
-export interface RelatedReadItem {
-  title: string;
-  link: string;
-  source: string;
+export interface WeeklyRecapData {
+  subject_line: string;
+  intro: string;
+  week_in_review: string;
+  top_themes: string[];
+  topStories: Article[];
+  aiHighlights: Article[];
+  techHighlights: Article[];
+  totalArticlesThisWeek: number;
+  totalSourcesThisWeek: number;
+  generatedAt: string;
 }
 
 export interface NewsletterData {
@@ -63,21 +70,19 @@ export interface NewsletterData {
   tldr: string;
   weekly_trend: string;
   editors_take: string;
+  discussion_question: string;
   speed_read: SpeedReadItem[];
   read_time_minutes: number;
   deep_dive: DeepDiveData | null;
   paper_of_the_day: PaperOfTheDayData | null;
   data_points: DataPointItem[];
-  key_takeaways: string[];
-  quote_of_the_day: QuoteOfTheDayData | null;
-  related_reads: RelatedReadItem[];
+  community_pulse: CommunityPulseRepo[];
   topStories: Article[];
   aiNews: Article[];
   techNews: Article[];
   securityNews: Article[];
   cloudNews: Article[];
   allArticles: Article[];
-  /** IDs of articles already placed in a named section (top/ai/tech/security/cloud) */
   sectionArticleIds: Set<string>;
   toolOfTheDay: ToolOfTheDayData | null;
   generatedAt: string;
@@ -317,37 +322,46 @@ function collectDataPoints(articles: Article[]): DataPointItem[] {
   return points.slice(0, 4);
 }
 
+export interface ComposeOptions {
+  communityPulse?: CommunityPulseRepo[];
+}
+
 export async function composeNewsletter(
-  articles: Article[]
+  articles: Article[],
+  options: ComposeOptions = {}
 ): Promise<NewsletterData> {
   const sorted = [...articles].sort(
     (a, b) => (b.ai_importance || 0) - (a.ai_importance || 0)
   );
 
+  let settings: Awaited<ReturnType<typeof getSettings>>;
+  try {
+    settings = await getSettings();
+  } catch {
+    settings = await getSettings();
+  }
+
   const { topStories, aiNews, techNews, securityNews, cloudNews, usedIds } = categorizeArticles(sorted);
-  const speedRead = buildSpeedRead(sorted);
+  const speedRead = settings.showSpeedRead ? buildSpeedRead(sorted) : [];
   const readTime = estimateReadTime(sorted.slice(0, 20));
+  const dataPoints = settings.showDataPoints ? collectDataPoints(sorted) : [];
+  const pulse = settings.showCommunityPulse ? (options.communityPulse || []) : [];
 
   let toolOfTheDay: ToolOfTheDayData | null = null;
-  try {
-    const settings = await getSettings();
-    if (settings.showToolOfTheDay) {
-      const toolArticle = sorted.find((a) => a.ai_category === "ai_tool");
-      if (toolArticle) {
-        toolOfTheDay = {
-          title: toolArticle.title,
-          link: toolArticle.link,
-          source: toolArticle.source,
-          ai_summary: toolArticle.ai_summary,
-          ai_importance: toolArticle.ai_importance,
-          ai_tags: toolArticle.ai_tags,
-          key_takeaway: toolArticle.key_takeaway,
-        };
-        logger.info(`Tool of the Day: "${toolArticle.title}"`);
-      }
+  if (settings.showToolOfTheDay) {
+    const toolArticle = sorted.find((a) => a.ai_category === "ai_tool");
+    if (toolArticle) {
+      toolOfTheDay = {
+        title: toolArticle.title,
+        link: toolArticle.link,
+        source: toolArticle.source,
+        ai_summary: toolArticle.ai_summary,
+        ai_importance: toolArticle.ai_importance,
+        ai_tags: toolArticle.ai_tags,
+        key_takeaway: toolArticle.key_takeaway,
+      };
+      logger.info(`Tool of the Day: "${toolArticle.title}"`);
     }
-  } catch {
-    // skip
   }
 
   const articlesContext = sorted
@@ -365,8 +379,6 @@ export async function composeNewsletter(
     day: "numeric",
   });
 
-  const dataPoints = collectDataPoints(sorted);
-
   const fallback: NewsletterData = {
     subject_line: `🤖 AI & Tech Daily — ${today}`,
     intro: `Good morning! Here's your curated roundup of the most important AI and tech stories from the past 24 hours.`,
@@ -375,19 +387,18 @@ export async function composeNewsletter(
     tldr: "Another busy day in tech — here are the stories that matter.",
     weekly_trend: "",
     editors_take: "",
+    discussion_question: "",
     speed_read: speedRead,
     read_time_minutes: readTime,
     deep_dive: null,
     paper_of_the_day: null,
     data_points: dataPoints,
-    key_takeaways: [],
-    quote_of_the_day: null,
-    related_reads: [],
+    community_pulse: pulse,
     topStories,
     aiNews,
     techNews,
-    securityNews,
-    cloudNews,
+    securityNews: settings.showSecurityNews ? securityNews : [],
+    cloudNews: settings.showCloudNews ? cloudNews : [],
     allArticles: sorted,
     sectionArticleIds: usedIds,
     toolOfTheDay,
@@ -397,7 +408,12 @@ export async function composeNewsletter(
   try {
     const groq = getGroqClient();
 
-    const [compositionRes, editorsTake, deepDive, paperOfTheDay] = await Promise.all([
+    const aiCalls: [
+      Promise<any>,
+      Promise<string>,
+      Promise<DeepDiveData | null>,
+      Promise<PaperOfTheDayData | null>,
+    ] = [
       groq.chat.completions.create({
         model: "llama-3.3-70b-versatile",
         messages: [
@@ -416,7 +432,8 @@ Return this JSON:
   "intro": "2-3 sentence greeting mentioning what's big in tech today. Conversational, smart tone.",
   "top_story_highlight": "2-3 sentences about the biggest story today. Why it matters.",
   "tldr": "One punchy sentence summarizing today in tech.",
-  "weekly_trend": "Analyze the themes across these stories. What patterns do you see? What's the bigger narrative in tech this week? 2-3 sentences identifying trends (e.g., 'AI regulation is heating up', 'Big tech is pivoting to open source'). Be insightful and forward-looking."
+  "weekly_trend": "Analyze the themes across these stories. What patterns do you see? What's the bigger narrative in tech this week? 2-3 sentences identifying trends (e.g., 'AI regulation is heating up', 'Big tech is pivoting to open source'). Be insightful and forward-looking."${settings.showDiscussionQuestion ? `,
+  "discussion_question": "One engaging question that invites readers to reply with their opinion on today's biggest story. Start with 'What's your take:' or similar. Make it specific, not generic."` : ""}
 }
 
 Tone: Sharp, witty, no fluff — like Benedict Evans meets Stratechery.
@@ -426,10 +443,18 @@ Do NOT use markdown in any of the values.`,
         temperature: 0.7,
         max_tokens: 800,
       }),
-      generateEditorsTake(groq, articlesContext, today),
-      topStories[0] ? generateDeepDive(groq, topStories[0]) : Promise.resolve(null),
-      generatePaperOfTheDay(groq, sorted),
-    ]);
+      settings.showEditorsTake
+        ? generateEditorsTake(groq, articlesContext, today)
+        : Promise.resolve(""),
+      settings.showDeepDive && topStories[0]
+        ? generateDeepDive(groq, topStories[0])
+        : Promise.resolve(null),
+      settings.showPaperOfTheDay
+        ? generatePaperOfTheDay(groq, sorted)
+        : Promise.resolve(null),
+    ];
+
+    const [compositionRes, editorsTake, deepDive, paperOfTheDay] = await Promise.all(aiCalls);
 
     const responseText = compositionRes.choices[0]?.message?.content || "";
     const jsonMatch = responseText.match(/\{[\s\S]*\}/);
@@ -445,19 +470,20 @@ Do NOT use markdown in any of the values.`,
         tldr: aiContent.tldr,
         weekly_trend: aiContent.weekly_trend || "",
         editors_take: editorsTake,
+        discussion_question: settings.showDiscussionQuestion
+          ? (aiContent.discussion_question || "")
+          : "",
         speed_read: speedRead,
         read_time_minutes: readTime,
         deep_dive: deepDive,
         paper_of_the_day: paperOfTheDay,
         data_points: dataPoints,
-        key_takeaways: [],
-        quote_of_the_day: null,
-        related_reads: [],
+        community_pulse: pulse,
         topStories,
         aiNews,
         techNews,
-        securityNews,
-        cloudNews,
+        securityNews: settings.showSecurityNews ? securityNews : [],
+        cloudNews: settings.showCloudNews ? cloudNews : [],
         allArticles: sorted,
         sectionArticleIds: usedIds,
         toolOfTheDay,
@@ -466,6 +492,99 @@ Do NOT use markdown in any of the values.`,
     }
   } catch (error) {
     logger.error(`Newsletter composition failed: ${(error as Error).message}`);
+  }
+
+  return fallback;
+}
+
+export async function composeWeeklyNewsletter(
+  articles: Article[]
+): Promise<WeeklyRecapData> {
+  const sorted = [...articles].sort(
+    (a, b) => (b.ai_importance || 0) - (a.ai_importance || 0)
+  );
+
+  const uniqueSources = new Set(sorted.map((a) => a.source));
+  const topStories = sorted.slice(0, 10);
+  const aiHighlights = sorted
+    .filter((a) => a.ai_category?.includes("ai"))
+    .slice(0, 5);
+  const techHighlights = sorted
+    .filter((a) => !a.ai_category?.includes("ai"))
+    .slice(0, 5);
+
+  const articlesContext = sorted
+    .slice(0, 20)
+    .map(
+      (a) =>
+        `Title: ${a.title}\nSummary: ${a.ai_summary || a.description}\nCategory: ${a.ai_category}\nSource: ${a.source}\nImportance: ${a.ai_importance}/10`
+    )
+    .join("\n\n");
+
+  const fallback: WeeklyRecapData = {
+    subject_line: `📊 AI & Tech Weekly — Week in Review`,
+    intro: "Here's your weekly roundup of the most important stories in AI and tech.",
+    week_in_review: "",
+    top_themes: [],
+    topStories,
+    aiHighlights,
+    techHighlights,
+    totalArticlesThisWeek: sorted.length,
+    totalSourcesThisWeek: uniqueSources.size,
+    generatedAt: new Date().toISOString(),
+  };
+
+  try {
+    const groq = getGroqClient();
+
+    const response = await groq.chat.completions.create({
+      model: "llama-3.3-70b-versatile",
+      messages: [
+        {
+          role: "user",
+          content: `You are the editor of "AI & Tech Daily", writing the WEEKLY recap edition sent on Sundays.
+You have ${sorted.length} articles from this week across ${uniqueSources.size} sources. Here are the top 20:
+
+${articlesContext}
+
+Return ONLY valid JSON:
+{
+  "subject_line": "A catchy weekly recap subject with one emoji (under 60 chars)",
+  "intro": "2-3 sentence opening that captures the mood of the week in tech. What was the dominant narrative?",
+  "week_in_review": "A 4-6 sentence 'Week in Review' essay. Identify the 2-3 biggest themes of the week and weave them into a narrative. What happened, what it means, and what to watch next week. Write in flowing prose like a Benedict Evans weekly email.",
+  "top_themes": ["Theme 1: short description", "Theme 2: short description", "Theme 3: short description"]
+}
+
+Tone: Reflective, insightful, connecting dots across the week's stories.
+Do NOT use markdown in any values.`,
+        },
+      ],
+      temperature: 0.75,
+      max_tokens: 800,
+    });
+
+    const responseText = response.choices[0]?.message?.content || "";
+    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+
+    if (jsonMatch) {
+      const aiContent = JSON.parse(jsonMatch[0]);
+      logger.info(`Weekly newsletter composed: "${aiContent.subject_line}"`);
+
+      return {
+        subject_line: aiContent.subject_line,
+        intro: aiContent.intro,
+        week_in_review: aiContent.week_in_review || "",
+        top_themes: aiContent.top_themes || [],
+        topStories,
+        aiHighlights,
+        techHighlights,
+        totalArticlesThisWeek: sorted.length,
+        totalSourcesThisWeek: uniqueSources.size,
+        generatedAt: new Date().toISOString(),
+      };
+    }
+  } catch (error) {
+    logger.error(`Weekly composition failed: ${(error as Error).message}`);
   }
 
   return fallback;

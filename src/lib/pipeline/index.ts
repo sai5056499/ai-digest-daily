@@ -2,6 +2,7 @@ import { collectFromRSS } from "@/lib/collectors/rssFeedCollector";
 import {
   collectFromHackerNews,
   collectFromReddit,
+  collectGitHubTrending,
 } from "@/lib/collectors/apiCollector";
 import { summarizeArticles } from "@/lib/ai/summarizer";
 import {
@@ -9,8 +10,8 @@ import {
   filterRecentArticles,
   rankArticles,
 } from "@/lib/ai/deduplicator";
-import { composeNewsletter } from "@/lib/ai/newsletterComposer";
-import { sendDailyDigest, sendBreakingAlerts } from "@/lib/delivery/emailSender";
+import { composeNewsletter, composeWeeklyNewsletter } from "@/lib/ai/newsletterComposer";
+import { sendDailyDigest, sendBreakingAlerts, sendWeeklyDigest } from "@/lib/delivery/emailSender";
 import { sendToTelegram } from "@/lib/delivery/telegramBot";
 import { saveArticlesBatch, getRecentArticles } from "@/lib/database/firebase";
 import { logger } from "@/lib/utils/logger";
@@ -115,12 +116,29 @@ export async function runFullPipeline(): Promise<PipelineResult> {
     );
     stepDone("save", `${savedCount} new articles saved`);
 
+    // ─── STEP 5b: GitHub Trending ─────────────────────
+    stepStart("github", "Fetching trending repos...");
+    let communityPulse: { name: string; url: string; description: string; language: string; stars: number }[] = [];
+    try {
+      const ghRepos = await collectGitHubTrending();
+      communityPulse = ghRepos.slice(0, 6).map((r) => ({
+        name: r.fullName,
+        url: r.url,
+        description: r.description,
+        language: r.language,
+        stars: r.stars,
+      }));
+      stepDone("github", `${communityPulse.length} repos`);
+    } catch (e) {
+      stepError("github", (e as Error).message);
+    }
+
     // ─── STEP 6: Compose newsletter ─────────────────────
     stepStart("compose", "AI writing newsletter...");
     const bestArticles = await getRecentArticles(24, 50);
     const articlesForNewsletter =
       bestArticles.length > 0 ? bestArticles : (rankedArticles as any);
-    const newsletter = await composeNewsletter(articlesForNewsletter);
+    const newsletter = await composeNewsletter(articlesForNewsletter, { communityPulse });
     stepDone("compose", newsletter.subject_line);
 
     // ─── STEP 7: Send emails ────────────────────────────
@@ -171,6 +189,56 @@ export async function runFullPipeline(): Promise<PipelineResult> {
       emailsFailed: 0,
       telegramSent: 0,
       breakingAlertsSent: 0,
+      duration: `${duration}s`,
+      error: (error as Error).message,
+    };
+  }
+}
+
+export async function runWeeklyPipeline(): Promise<{
+  success: boolean;
+  emailsSent: number;
+  emailsFailed: number;
+  articlesCount: number;
+  duration: string;
+  error?: string;
+}> {
+  const startTime = Date.now();
+  logger.info("===== WEEKLY PIPELINE STARTED =====");
+
+  try {
+    const weeklyArticles = await getRecentArticles(168, 200);
+    logger.info(`Weekly: ${weeklyArticles.length} articles from the past 7 days`);
+
+    if (weeklyArticles.length === 0) {
+      logger.warn("No articles found for weekly digest");
+      return { success: true, emailsSent: 0, emailsFailed: 0, articlesCount: 0, duration: "0s" };
+    }
+
+    const weeklyNewsletter = await composeWeeklyNewsletter(weeklyArticles);
+    logger.info(`Weekly newsletter composed: "${weeklyNewsletter.subject_line}"`);
+
+    const result = await sendWeeklyDigest(weeklyNewsletter);
+
+    const duration = ((Date.now() - startTime) / 1000).toFixed(1);
+    logger.info(`===== WEEKLY PIPELINE COMPLETE in ${duration}s =====`);
+
+    return {
+      success: true,
+      emailsSent: result.sentCount,
+      emailsFailed: result.failCount,
+      articlesCount: weeklyArticles.length,
+      duration: `${duration}s`,
+    };
+  } catch (error) {
+    const duration = ((Date.now() - startTime) / 1000).toFixed(1);
+    logger.error(`WEEKLY PIPELINE FAILED: ${(error as Error).message}`);
+
+    return {
+      success: false,
+      emailsSent: 0,
+      emailsFailed: 0,
+      articlesCount: 0,
       duration: `${duration}s`,
       error: (error as Error).message,
     };

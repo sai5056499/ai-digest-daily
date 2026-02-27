@@ -29,6 +29,7 @@ const FULL_STEPS = [
   { id: "ai", label: "AI processing (summarize, rank, insights)" },
   { id: "breaking", label: "Checking breaking news alerts" },
   { id: "save", label: "Saving to database" },
+  { id: "github", label: "Fetching GitHub Trending" },
   { id: "compose", label: "Composing newsletter" },
   { id: "email", label: "Sending emails" },
   { id: "telegram", label: "Sending Telegram" },

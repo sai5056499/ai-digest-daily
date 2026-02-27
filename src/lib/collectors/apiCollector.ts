@@ -188,3 +188,58 @@ export async function collectFromReddit(
   logger.info(`Reddit total: ${articles.length} posts collected`);
   return articles;
 }
+
+// ─── GitHub Trending (scrape the public trending page) ────
+
+export interface GitHubTrendingRepo {
+  name: string;
+  fullName: string;
+  url: string;
+  description: string;
+  language: string;
+  stars: number;
+  todayStars: number;
+}
+
+export async function collectGitHubTrending(): Promise<GitHubTrendingRepo[]> {
+  const repos: GitHubTrendingRepo[] = [];
+
+  try {
+    logger.info("Fetching GitHub Trending...");
+
+    const res = await fetch("https://api.github.com/search/repositories?q=created:>=" +
+      new Date(Date.now() - 7 * 86400000).toISOString().split("T")[0] +
+      "&sort=stars&order=desc&per_page=10", {
+      headers: {
+        Accept: "application/vnd.github.v3+json",
+        "User-Agent": "AITechNewsBot/1.0",
+      },
+      signal: AbortSignal.timeout(10000),
+    });
+
+    if (!res.ok) {
+      logger.warn(`GitHub API: HTTP ${res.status}`);
+      return repos;
+    }
+
+    const data = await res.json();
+
+    for (const item of data.items || []) {
+      repos.push({
+        name: item.name,
+        fullName: item.full_name,
+        url: item.html_url,
+        description: item.description || "",
+        language: item.language || "Unknown",
+        stars: item.stargazers_count,
+        todayStars: item.stargazers_count,
+      });
+    }
+
+    logger.info(`GitHub Trending: ${repos.length} repos collected`);
+  } catch (error) {
+    logger.error(`GitHub Trending failed: ${(error as Error).message}`);
+  }
+
+  return repos;
+}

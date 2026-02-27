@@ -12,7 +12,21 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { email, name, frequency = "daily", categories = ["ai", "tech"] } = body;
+    const { email, name, frequency = "daily" } = body;
+    let { categories } = body;
+
+    const VALID_CATEGORIES = [
+      "ai_breakthrough", "ai_tool", "ai_research", "tech_news", "startup",
+      "cybersecurity", "cloud", "devops", "dev_community", "gadgets",
+      "software", "business", "science", "ai", "tech",
+    ];
+
+    if (!Array.isArray(categories) || categories.length === 0) {
+      categories = ["ai", "tech"];
+    } else {
+      categories = categories.filter((c: string) => typeof c === "string" && VALID_CATEGORIES.includes(c));
+      if (categories.length === 0) categories = ["ai", "tech"];
+    }
 
     if (!email || typeof email !== "string" || !email.includes("@") || email.length > 320) {
       return NextResponse.json(

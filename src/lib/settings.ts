@@ -35,10 +35,11 @@ export interface SiteSettings {
   showDeepDive: boolean;
   showPaperOfTheDay: boolean;
   showDataPoints: boolean;
-  // Phase 3 engagement & polish
-  showKeyTakeaways: boolean;
-  showQuoteOfTheDay: boolean;
-  showRelatedReads: boolean;
+  // Phase 3 engagement & growth
+  showCommunityPulse: boolean;
+  showDiscussionQuestion: boolean;
+  weeklyEditionEnabled: boolean;
+  weeklySendDayUtc: number;
   // Feature: Tool of the Day
   showToolOfTheDay: boolean;
 }
@@ -70,9 +71,10 @@ const DEFAULTS: SiteSettings = {
   showDeepDive: true,
   showPaperOfTheDay: true,
   showDataPoints: true,
-  showKeyTakeaways: true,
-  showQuoteOfTheDay: true,
-  showRelatedReads: true,
+  showCommunityPulse: true,
+  showDiscussionQuestion: true,
+  weeklyEditionEnabled: true,
+  weeklySendDayUtc: 0,
   showToolOfTheDay: true,
 };
 

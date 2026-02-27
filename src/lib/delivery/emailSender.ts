@@ -1,8 +1,8 @@
 import nodemailer from "nodemailer";
-import { renderDailyDigest } from "./templates/dailyDigest";
+import { renderDailyDigest, renderWeeklyDigest } from "./templates/dailyDigest";
 import { getActiveSubscribers, createEmailLog, updateSubscriber } from "@/lib/database/firebase";
 import type { Article, Subscriber } from "@/lib/database/firebase";
-import type { NewsletterData } from "@/lib/ai/newsletterComposer";
+import type { NewsletterData, WeeklyRecapData } from "@/lib/ai/newsletterComposer";
 import { logger } from "@/lib/utils/logger";
 
 // ─── Email Transport ─────────────────────────────────────────
@@ -92,15 +92,17 @@ export async function sendDailyDigest(
         toolOfTheDay: newsletter.toolOfTheDay || null,
       });
 
+      const subject = editionSubject(newsletter.subject_line, subscriber);
+
       await sendEmail({
         to: subscriber.email,
-        subject: newsletter.subject_line,
+        subject,
         html,
       });
 
       await createEmailLog({
         subscriber_id: subscriber.id!,
-        subject: newsletter.subject_line,
+        subject,
         articles_count: newsletter.allArticles.length,
         sent_at: new Date().toISOString(),
         opened: false,
@@ -142,7 +144,99 @@ export async function sendDailyDigest(
   return { sentCount, failCount };
 }
 
+// ─── Weekly Digest ──────────────────────────────────────────
+
+export async function sendWeeklyDigest(
+  weeklyData: WeeklyRecapData
+): Promise<{ sentCount: number; failCount: number }> {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  const subscribers = await getActiveSubscribers("weekly");
+
+  if (subscribers.length === 0) {
+    logger.warn("No weekly subscribers found. Skipping weekly send.");
+    return { sentCount: 0, failCount: 0 };
+  }
+
+  logger.info(`Sending weekly digest to ${subscribers.length} subscribers via ${getProvider().toUpperCase()}...`);
+
+  let sentCount = 0;
+  let failCount = 0;
+
+  for (const subscriber of subscribers) {
+    try {
+      const html = renderWeeklyDigest({
+        weeklyData,
+        subscriberEmail: subscriber.email,
+        unsubscribeToken: subscriber.unsubscribe_token,
+        appUrl,
+      });
+
+      await sendEmail({
+        to: subscriber.email,
+        subject: weeklyData.subject_line,
+        html,
+      });
+
+      await createEmailLog({
+        subscriber_id: subscriber.id!,
+        subject: weeklyData.subject_line,
+        articles_count: weeklyData.totalArticlesThisWeek,
+        sent_at: new Date().toISOString(),
+        opened: false,
+        clicked: false,
+        status: "sent",
+      });
+
+      await updateSubscriber(subscriber.id!, {
+        last_email_sent: new Date().toISOString(),
+        emails_received: subscriber.emails_received + 1,
+      });
+
+      sentCount++;
+      logger.info(`Weekly sent to: ${subscriber.email}`);
+      await new Promise((r) => setTimeout(r, 500));
+    } catch (error) {
+      failCount++;
+      logger.error(`Weekly send failed for ${subscriber.email}: ${(error as Error).message}`);
+    }
+  }
+
+  logger.info(`Weekly sending complete: ${sentCount} sent, ${failCount} failed`);
+  return { sentCount, failCount };
+}
+
+// ─── Edition Subject Line ────────────────────────────────────
+
+const EDITION_MAP: Record<string, string> = {
+  cybersecurity: "Security Brief",
+  cloud: "Cloud & DevOps",
+  ai: "AI Focus",
+  dev_community: "Dev Digest",
+  startup: "Startup Watch",
+  science: "Science Spotlight",
+};
+
+function editionSubject(defaultSubject: string, subscriber: Subscriber): string {
+  const cats = subscriber.categories || [];
+  if (cats.length === 0 || cats.length > 3) return defaultSubject;
+
+  for (const [key, label] of Object.entries(EDITION_MAP)) {
+    if (cats.length <= 2 && cats.every((c) => c.includes(key) || key.includes(c))) {
+      return defaultSubject.replace(/AI & Tech Daily/, `AI & Tech Daily: ${label}`);
+    }
+  }
+  return defaultSubject;
+}
+
 // ─── Personalization ─────────────────────────────────────────
+
+function matchesCategories(article: Article, prefs: string[]): boolean {
+  const cat = (article.ai_category || "").toLowerCase();
+  return prefs.some((p) => {
+    const pl = p.toLowerCase();
+    return cat === pl || cat.includes(pl) || pl.includes(cat);
+  });
+}
 
 function personalizeForSubscriber(
   newsletter: NewsletterData,
@@ -151,23 +245,35 @@ function personalizeForSubscriber(
   const prefs = subscriber.categories || [];
   if (prefs.length === 0) return newsletter;
 
-  const matchesPrefs = (article: Article) => {
-    const cat = (article.ai_category || "").toLowerCase();
-    return prefs.some(
-      (p) => cat.includes(p.toLowerCase()) || p.toLowerCase().includes(cat)
-    );
-  };
+  const matches = (a: Article) => matchesCategories(a, prefs);
 
-  const topStories = newsletter.topStories.filter(matchesPrefs);
-  const aiNews = newsletter.aiNews.filter(matchesPrefs);
-  const techNews = newsletter.techNews.filter(matchesPrefs);
-  const securityNews = newsletter.securityNews.filter(matchesPrefs);
-  const cloudNews = newsletter.cloudNews.filter(matchesPrefs);
+  const filteredAll = newsletter.allArticles.filter(matches);
+
+  // If filtering leaves fewer than 3 articles, the subscriber's prefs are
+  // too narrow for today's content -- return the full newsletter instead of
+  // sending a nearly empty email.
+  if (filteredAll.length < 3) return newsletter;
+
+  // Top stories: prefer matched articles but keep originals as fallback
+  // so the email never has an empty hero section.
+  const matchedTop = newsletter.topStories.filter(matches);
+  const topStories = matchedTop.length >= 2 ? matchedTop : newsletter.topStories;
+
+  const aiNews = newsletter.aiNews.filter(matches);
+  const techNews = newsletter.techNews.filter(matches);
+  const securityNews = newsletter.securityNews.filter(matches);
+  const cloudNews = newsletter.cloudNews.filter(matches);
 
   const sectionArticleIds = new Set<string>();
   [topStories, aiNews, techNews, securityNews, cloudNews].forEach((section) =>
     section.forEach((a) => sectionArticleIds.add(a.guid || a.link))
   );
+
+  // Filter speed read to subscriber interests
+  const speedRead = newsletter.speed_read.filter((item) => {
+    const matchingArticle = filteredAll.find((a) => a.link === item.link);
+    return !!matchingArticle;
+  });
 
   return {
     ...newsletter,
@@ -176,8 +282,9 @@ function personalizeForSubscriber(
     techNews,
     securityNews,
     cloudNews,
-    allArticles: newsletter.allArticles.filter(matchesPrefs),
+    allArticles: filteredAll,
     sectionArticleIds,
+    speed_read: speedRead.length >= 3 ? speedRead : newsletter.speed_read,
   };
 }
 
