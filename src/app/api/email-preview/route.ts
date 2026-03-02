@@ -343,10 +343,10 @@ const WEEKLY_SAMPLE = {
 
 export async function GET(request: NextRequest) {
   try {
-    const themeParam = request.nextUrl.searchParams.get("theme") || "dark";
+    const themeParam = request.nextUrl.searchParams.get("theme") || "notionDark";
     const theme = ["dark", "light", "notion", "notionDark"].includes(themeParam)
       ? (themeParam as EmailTheme)
-      : "dark";
+      : "notionDark";
     const edition = request.nextUrl.searchParams.get("edition") || "daily";
 
     if (edition === "weekly") {

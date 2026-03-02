@@ -8,7 +8,7 @@ type Edition = "daily" | "weekly";
 
 export default function EmailPreviewPage() {
   const [device, setDevice] = useState<Device>("desktop");
-  const [theme, setTheme] = useState<Theme>("notion");
+  const [theme, setTheme] = useState<Theme>("notionDark");
   const [edition, setEdition] = useState<Edition>("daily");
   const [loaded, setLoaded] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
