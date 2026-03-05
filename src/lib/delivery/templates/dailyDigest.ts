@@ -744,7 +744,7 @@ export interface EmailTemplateData {
 
 export function renderDailyDigest(data: EmailTemplateData): string {
   const { newsletter, issueNumber, unsubscribeToken, appUrl } = data;
-  const themeName = data.theme || "notion";
+  const themeName = data.theme || "notionDark";
   const themeColors = getThemeColors(themeName);
 
   const uniqueSources = new Set(
